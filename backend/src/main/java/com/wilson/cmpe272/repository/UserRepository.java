@@ -21,10 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                                       @Param("code") String code, 
                                                       @Param("now") LocalDateTime now);
     
-    @Query("SELECT u FROM User u WHERE u.phoneNumber = :phoneNumber AND u.phoneVerificationCode = :code AND u.phoneVerificationExpiresAt > :now")
-    Optional<User> findByPhoneNumberAndPhoneVerificationCode(@Param("phoneNumber") String phoneNumber, 
-                                                            @Param("code") String code, 
-                                                            @Param("now") LocalDateTime now);
     
     @Query("SELECT u FROM User u WHERE u.email = :email AND u.isEmailVerified = true")
     Optional<User> findByEmailAndEmailVerified(@Param("email") String email);

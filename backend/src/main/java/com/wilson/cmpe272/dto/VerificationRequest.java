@@ -12,8 +12,6 @@ public class VerificationRequest {
     @NotBlank(message = "Verification code is required")
     private String code;
     
-    private String phoneNumber;
-    
     // Constructors
     public VerificationRequest() {}
     
@@ -37,13 +35,5 @@ public class VerificationRequest {
     
     public void setCode(String code) {
         this.code = code;
-    }
-    
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-    
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
     }
 }

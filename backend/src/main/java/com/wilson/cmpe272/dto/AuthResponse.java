@@ -26,6 +26,7 @@ public class AuthResponse {
         this.lastName = user.getLastName();
         this.twoFactorMethod = user.getTwoFactorMethod();
         this.isTwoFactorEnabled = user.getIsTwoFactorEnabled();
+        this.requiresTwoFactor = user.getIsTwoFactorEnabled() && user.getTwoFactorMethod() != null;
     }
 
     public AuthResponse(User user, String message) {
@@ -35,6 +36,7 @@ public class AuthResponse {
         this.lastName = user.getLastName();
         this.twoFactorMethod = user.getTwoFactorMethod();
         this.isTwoFactorEnabled = user.getIsTwoFactorEnabled();
+        this.requiresTwoFactor = user.getIsTwoFactorEnabled() && user.getTwoFactorMethod() != null;
         this.message = message;
     }
     
@@ -121,5 +123,15 @@ public class AuthResponse {
     
     public void setMessage(String message) {
         this.message = message;
+    }
+    
+    public void setUser(User user) {
+        this.id = user.getId();
+        this.email = user.getEmail();
+        this.firstName = user.getFirstName();
+        this.lastName = user.getLastName();
+        this.twoFactorMethod = user.getTwoFactorMethod();
+        this.isTwoFactorEnabled = user.getIsTwoFactorEnabled();
+        this.requiresTwoFactor = user.getIsTwoFactorEnabled() && user.getTwoFactorMethod() != null;
     }
 }

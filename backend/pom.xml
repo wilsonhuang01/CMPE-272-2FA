@@ -85,15 +85,6 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
-		<!-- SMS (Mock implementation - replace with actual SMS provider) -->
-		<!-- 
-		<dependency>
-			<groupId>com.twilio.sdk</groupId>
-			<artifactId>twilio</artifactId>
-			<version>9.16.0</version>
-		</dependency>
-		-->
-
 		<!-- TOTP for Authenticator App -->
 		<dependency>
 			<groupId>commons-codec</groupId>

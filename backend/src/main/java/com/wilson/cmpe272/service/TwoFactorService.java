@@ -19,8 +19,6 @@ public class TwoFactorService {
     @Autowired
     private EmailService emailService;
     
-    @Autowired
-    private SmsService smsService;
     
     private final Random random = new Random();
     private final Base32 base32 = new Base32();
@@ -50,15 +48,6 @@ public class TwoFactorService {
         logger.info("Email verification code sent successfully to user: {}", user.getEmail());
     }
     
-    public void sendPhoneVerificationCode(User user) {
-        logger.info("Sending phone verification code to user: {} at phone: {}", user.getEmail(), user.getPhoneNumber());
-        String verificationCode = generateVerificationCode();
-        user.setPhoneVerificationCode(verificationCode);
-        user.setPhoneVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
-        
-        smsService.sendVerificationCode(user.getPhoneNumber(), verificationCode);
-        logger.info("Phone verification code sent successfully to user: {}", user.getEmail());
-    }
     
     public void sendTwoFactorCode(User user) {
         logger.info("Sending 2FA code for user: {} using method: {}", user.getEmail(), user.getTwoFactorMethod());
@@ -70,12 +59,6 @@ public class TwoFactorService {
                 emailService.sendTwoFactorCode(user.getEmail(), verificationCode);
                 user.setEmailVerificationCode(verificationCode);
                 user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(5));
-                break;
-            case SMS:
-                logger.info("Sending 2FA code via SMS to user: {} at phone: {}", user.getEmail(), user.getPhoneNumber());
-                smsService.sendTwoFactorCode(user.getPhoneNumber(), verificationCode);
-                user.setPhoneVerificationCode(verificationCode);
-                user.setPhoneVerificationExpiresAt(LocalDateTime.now().plusMinutes(5));
                 break;
             case AUTHENTICATOR_APP:
                 logger.debug("2FA via authenticator app - no code sent, user generates their own");
@@ -95,15 +78,6 @@ public class TwoFactorService {
         return isValid;
     }
     
-    public boolean verifyPhoneCode(User user, String code) {
-        logger.debug("Verifying phone code for user: {}", user.getEmail());
-        boolean isValid = code != null && 
-               code.equals(user.getPhoneVerificationCode()) &&
-               user.getPhoneVerificationExpiresAt() != null &&
-               user.getPhoneVerificationExpiresAt().isAfter(LocalDateTime.now());
-        logger.info("Phone code verification result for user {}: {}", user.getEmail(), isValid);
-        return isValid;
-    }
     
     public boolean verifyTwoFactorCode(User user, String code) {
         logger.debug("Verifying 2FA code for user: {} using method: {}", user.getEmail(), user.getTwoFactorMethod());
@@ -111,9 +85,6 @@ public class TwoFactorService {
         switch (user.getTwoFactorMethod()) {
             case EMAIL:
                 result = verifyEmailCode(user, code);
-                break;
-            case SMS:
-                result = verifyPhoneCode(user, code);
                 break;
             case AUTHENTICATOR_APP:
                 result = verifyTotpCode(user, code);

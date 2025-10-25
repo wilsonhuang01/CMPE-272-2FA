@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,9 @@ public class JwtService {
     
     @Value("${jwt.expiration}")
     private Long expiration;
+    
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
     
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
@@ -104,6 +108,13 @@ public class JwtService {
     
     public Boolean validateToken(String token, UserDetails userDetails) {
         logger.debug("Validating JWT token for user: {}", userDetails.getUsername());
+        
+        // Check if token is blacklisted first
+        if (tokenBlacklistService.isTokenBlacklisted(token)) {
+            logger.warn("JWT token is blacklisted for user: {}", userDetails.getUsername());
+            return false;
+        }
+        
         final String username = extractUsername(token);
         Boolean isValid = (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
         logger.info("JWT token validation result for user {}: {}", userDetails.getUsername(), isValid);
@@ -112,6 +123,13 @@ public class JwtService {
     
     public Boolean validateToken(String token) {
         logger.debug("Validating JWT token format and signature");
+        
+        // Check if token is blacklisted first
+        if (tokenBlacklistService.isTokenBlacklisted(token)) {
+            logger.warn("JWT token is blacklisted");
+            return false;
+        }
+        
         try {
             Jwts.parser()
                 .verifyWith(getSigningKey())

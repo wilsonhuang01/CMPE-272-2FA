@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,6 +18,8 @@ import java.util.List;
 @Entity
 @Table(name = "users")
 public class User implements UserDetails {
+    
+    private static final Logger logger = LoggerFactory.getLogger(User.class);
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +41,6 @@ public class User implements UserDetails {
     @Column(name = "last_name")
     private String lastName;
     
-    @Column(name = "phone_number")
-    private String phoneNumber;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "two_factor_method")
@@ -53,20 +55,14 @@ public class User implements UserDetails {
     @Column(name = "is_email_verified")
     private Boolean isEmailVerified = false;
     
-    @Column(name = "is_phone_verified")
-    private Boolean isPhoneVerified = false;
     
     @Column(name = "email_verification_code")
     private String emailVerificationCode;
     
-    @Column(name = "phone_verification_code")
-    private String phoneVerificationCode;
     
     @Column(name = "email_verification_expires_at")
     private LocalDateTime emailVerificationExpiresAt;
     
-    @Column(name = "phone_verification_expires_at")
-    private LocalDateTime phoneVerificationExpiresAt;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -81,7 +77,7 @@ public class User implements UserDetails {
     private UserStatus status = UserStatus.ACTIVE;
     
     public enum TwoFactorMethod {
-        EMAIL, SMS, AUTHENTICATOR_APP
+        EMAIL, AUTHENTICATOR_APP
     }
     
     public enum UserStatus {
@@ -135,7 +131,19 @@ public class User implements UserDetails {
     
     @Override
     public boolean isEnabled() {
-        return status == UserStatus.ACTIVE && isEmailVerified;
+        // Handle null case - Boolean wrapper can be null
+        boolean emailVerified = isEmailVerified != null && isEmailVerified;
+        boolean isEnabled = status == UserStatus.ACTIVE && emailVerified;
+        
+        logger.debug("Checking if user is enabled. Email: {}, Status: {}, isEmailVerified: {}", 
+            this.email, status, isEmailVerified);
+        
+        if (!isEnabled) {
+            logger.warn("User is not enabled. Email: {}, Status: {}, Email Verified: {}", 
+                this.email, status, isEmailVerified);
+        }
+        
+        return isEnabled;
     }
     
     // Getters and Setters
@@ -179,13 +187,6 @@ public class User implements UserDetails {
         this.lastName = lastName;
     }
     
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-    
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
     
     public TwoFactorMethod getTwoFactorMethod() {
         return twoFactorMethod;
@@ -219,13 +220,6 @@ public class User implements UserDetails {
         this.isEmailVerified = isEmailVerified;
     }
     
-    public Boolean getIsPhoneVerified() {
-        return isPhoneVerified;
-    }
-    
-    public void setIsPhoneVerified(Boolean isPhoneVerified) {
-        this.isPhoneVerified = isPhoneVerified;
-    }
     
     public String getEmailVerificationCode() {
         return emailVerificationCode;
@@ -235,13 +229,6 @@ public class User implements UserDetails {
         this.emailVerificationCode = emailVerificationCode;
     }
     
-    public String getPhoneVerificationCode() {
-        return phoneVerificationCode;
-    }
-    
-    public void setPhoneVerificationCode(String phoneVerificationCode) {
-        this.phoneVerificationCode = phoneVerificationCode;
-    }
     
     public LocalDateTime getEmailVerificationExpiresAt() {
         return emailVerificationExpiresAt;
@@ -251,13 +238,6 @@ public class User implements UserDetails {
         this.emailVerificationExpiresAt = emailVerificationExpiresAt;
     }
     
-    public LocalDateTime getPhoneVerificationExpiresAt() {
-        return phoneVerificationExpiresAt;
-    }
-    
-    public void setPhoneVerificationExpiresAt(LocalDateTime phoneVerificationExpiresAt) {
-        this.phoneVerificationExpiresAt = phoneVerificationExpiresAt;
-    }
     
     public LocalDateTime getCreatedAt() {
         return createdAt;

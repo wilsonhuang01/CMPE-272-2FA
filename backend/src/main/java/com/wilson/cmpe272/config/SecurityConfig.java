@@ -52,9 +52,9 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/verify-email", 
-                               "/api/auth/verify-phone", "/api/auth/resend-code", "/h2-console/**").permitAll()
+                               "/api/auth/resend-code", "/h2-console/**").permitAll()
                 .requestMatchers("/api/auth/change-password", "/api/auth/change-2fa", 
-                               "/api/auth/authenticator-qr").authenticated()
+                               "/api/auth/authenticator-qr", "/api/auth/logout", "/api/auth/profile").authenticated()
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

@@ -13,6 +13,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -38,6 +41,9 @@ public class AuthService {
     @Autowired
     private AuthenticationManager authenticationManager;
     
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+    
     public AuthResponse signup(SignupRequest signupRequest) {
         logger.info("Starting signup process for email: {}", signupRequest.getEmail());
         
@@ -60,7 +66,6 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
         user.setFirstName(signupRequest.getFirstName());
         user.setLastName(signupRequest.getLastName());
-        user.setPhoneNumber(signupRequest.getPhoneNumber());
         user.setTwoFactorMethod(signupRequest.getTwoFactorMethod());
         
         // Setup 2FA if requested
@@ -71,11 +76,10 @@ public class AuthService {
             }
             user.setIsTwoFactorEnabled(true);
         }
-        
-        // TODO: Uncomment this when email verification is configured
+
         // Send email verification
-        //logger.info("Sending email verification code to: {}", signupRequest.getEmail());
-        //twoFactorService.sendEmailVerificationCode(user);
+        logger.info("Sending email verification code to: {}", signupRequest.getEmail());
+        twoFactorService.sendEmailVerificationCode(user);
         
         user = userRepository.save(user);
         logger.info("User account created successfully with ID: {} for email: {}", user.getId(), signupRequest.getEmail());
@@ -104,6 +108,7 @@ public class AuthService {
                     AuthResponse response = new AuthResponse("Two-factor authentication required");
                     response.setRequiresTwoFactor(true);
                     response.setTwoFactorMethod(user.getTwoFactorMethod());
+                    userRepository.save(user);
                     return response;
                 } else {
                     // Verify 2FA code
@@ -147,6 +152,8 @@ public class AuthService {
             user.setIsEmailVerified(true);
             user.setEmailVerificationCode(null);
             user.setEmailVerificationExpiresAt(null);
+            user.setIsTwoFactorEnabled(true);
+            user.setTwoFactorMethod(User.TwoFactorMethod.EMAIL);
             userRepository.save(user);
             
             return new AuthResponse("Email verified successfully");
@@ -156,27 +163,6 @@ public class AuthService {
         }
     }
     
-    public AuthResponse verifyPhone(VerificationRequest verificationRequest) {
-        logger.info("Phone verification attempt for email: {}", verificationRequest.getEmail());
-        User user = userRepository.findByEmail(verificationRequest.getEmail())
-                .orElseThrow(() -> {
-                    logger.warn("Phone verification failed - user not found: {}", verificationRequest.getEmail());
-                    return new IllegalArgumentException("User not found");
-                });
-        
-        if (twoFactorService.verifyPhoneCode(user, verificationRequest.getCode())) {
-            logger.info("Phone verification successful for user: {}", verificationRequest.getEmail());
-            user.setIsPhoneVerified(true);
-            user.setPhoneVerificationCode(null);
-            user.setPhoneVerificationExpiresAt(null);
-            userRepository.save(user);
-            
-            return new AuthResponse("Phone verified successfully");
-        } else {
-            logger.warn("Phone verification failed - invalid or expired code for user: {}", verificationRequest.getEmail());
-            throw new IllegalArgumentException("Invalid or expired verification code");
-        }
-    }
     
     public AuthResponse changePassword(ChangePasswordRequest changePasswordRequest) {
         User user = getCurrentUser();
@@ -221,10 +207,6 @@ public class AuthService {
         if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.AUTHENTICATOR_APP) {
             logger.info("Setting up authenticator app for user: {}", user.getEmail());
             twoFactorService.setupAuthenticatorApp(user);
-        } else if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.SMS) {
-            logger.info("Setting up SMS 2FA for user: {} with phone: {}", user.getEmail(), change2FARequest.getPhoneNumber());
-            user.setPhoneNumber(change2FARequest.getPhoneNumber());
-            twoFactorService.sendPhoneVerificationCode(user);
         }
         
         userRepository.save(user);
@@ -268,21 +250,78 @@ public class AuthService {
             twoFactorService.sendEmailVerificationCode(user);
             userRepository.save(user);
             return new AuthResponse("Email verification code sent");
-        } else if ("phone".equals(type)) {
-            logger.info("Resending phone verification code to: {}", email);
-            twoFactorService.sendPhoneVerificationCode(user);
-            userRepository.save(user);
-            return new AuthResponse("Phone verification code sent");
         }
         
         logger.warn("Invalid verification type requested: {} for email: {}", type, email);
-        throw new IllegalArgumentException("Invalid verification type");
+        throw new IllegalArgumentException("Invalid verification type. Only 'email' is supported.");
+    }
+    
+    public AuthResponse logout() {
+        logger.info("Processing logout request");
+        try {
+            // Extract JWT token from request
+            String token = extractTokenFromRequest();
+            if (token != null) {
+                // Add token to blacklist
+                tokenBlacklistService.blacklistToken(token);
+                logger.info("Token added to blacklist during logout");
+            }
+            
+            // Clear the security context
+            SecurityContextHolder.clearContext();
+            logger.info("Security context cleared successfully");
+            return new AuthResponse("Logged out successfully");
+        } catch (Exception e) {
+            logger.error("Logout failed - Error: {}", e.getMessage());
+            throw new RuntimeException("Logout failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Extract JWT token from the Authorization header
+     * @return The JWT token or null if not found
+     */
+    private String extractTokenFromRequest() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    return authHeader.substring(7); // Remove "Bearer " prefix
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to extract token from request: {}", e.getMessage());
+        }
+        return null;
+    }
+    
+    public AuthResponse getCurrentUserProfile() {
+        logger.info("Retrieving current user profile");
+        try {
+            User user = getCurrentUser();
+            logger.info("User profile retrieved for email: {}", user.getEmail());
+            
+            // Create a response with user profile information
+            AuthResponse response = new AuthResponse("User profile retrieved successfully");
+            response.setUser(user);
+            return response;
+        } catch (Exception e) {
+            logger.error("Get user profile failed - Error: {}", e.getMessage());
+            throw new RuntimeException("Failed to retrieve user profile: " + e.getMessage());
+        }
     }
     
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            logger.error("No authentication found in SecurityContext");
+            throw new RuntimeException("User not authenticated");
+        }
         User user = (User) authentication.getPrincipal();
-        logger.debug("Retrieved current user: {}", user.getEmail());
+        logger.debug("Retrieved current user: {}, Status: {}, IsEmailVerified: {}, IsEnabled: {}", 
+            user.getEmail(), user.getStatus(), user.getIsEmailVerified(), user.isEnabled());
         return user;
     }
 }

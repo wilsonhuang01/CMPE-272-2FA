@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -62,18 +63,6 @@ public class AuthController {
         }
     }
     
-    @PostMapping("/verify-phone")
-    public ResponseEntity<AuthResponse> verifyPhone(@Valid @RequestBody VerificationRequest verificationRequest) {
-        logger.info("Phone verification request received for email: {}", verificationRequest.getEmail());
-        try {
-            AuthResponse response = authService.verifyPhone(verificationRequest);
-            logger.info("Phone verification successful for email: {}", verificationRequest.getEmail());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.error("Phone verification failed for email: {} - Error: {}", verificationRequest.getEmail(), e.getMessage());
-            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
-        }
-    }
     
     @PostMapping("/change-password")
     public ResponseEntity<AuthResponse> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
@@ -125,6 +114,32 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Resend verification code failed for email: {}, type: {} - Error: {}", email, type, e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/logout")
+    public ResponseEntity<AuthResponse> logout() {
+        logger.info("Logout request received");
+        try {
+            AuthResponse response = authService.logout();
+            logger.info("Logout successful");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Logout failed - Error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/profile")
+    public ResponseEntity<AuthResponse> getCurrentUserProfile() {
+        logger.info("Get current user profile request received");
+        try {
+            AuthResponse response = authService.getCurrentUserProfile();
+            logger.info("User profile retrieved successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Get user profile failed - Error: {}", e.getMessage());
             return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
         }
     }
