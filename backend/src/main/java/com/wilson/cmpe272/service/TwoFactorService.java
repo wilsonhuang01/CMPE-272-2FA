@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Random;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
 
 @Service
 public class TwoFactorService {
@@ -98,10 +101,7 @@ public class TwoFactorService {
     }
     
     public boolean verifyTotpCode(User user, String code) {
-        // This is a simplified TOTP verification
-        // In a production environment, you would use a proper TOTP library
-        // like Google Authenticator or Authy
-        logger.debug("Verifying TOTP code for user: {}", user.getEmail());
+        logger.debug("Verifying TOTP code for user: {} using Authy-compatible verification", user.getEmail());
         
         if (user.getTwoFactorSecret() == null || code == null) {
             logger.warn("TOTP verification failed - missing secret or code for user: {}", user.getEmail());
@@ -109,11 +109,12 @@ public class TwoFactorService {
         }
         
         try {
-            long currentTime = System.currentTimeMillis() / 1000 / 30; // 30-second window
+            // Get current time step (30-second window)
+            long currentTimeStep = System.currentTimeMillis() / 1000 / 30;
             
-            // Generate codes for current and previous/next time windows
+            // Check current, previous, and next time windows for clock drift tolerance
             for (int i = -1; i <= 1; i++) {
-                String expectedCode = generateTotpCode(user.getTwoFactorSecret(), currentTime + i);
+                String expectedCode = generateTotpCode(user.getTwoFactorSecret(), currentTimeStep + i);
                 if (code.equals(expectedCode)) {
                     logger.info("TOTP code verification successful for user: {}", user.getEmail());
                     return true;
@@ -128,32 +129,38 @@ public class TwoFactorService {
         }
     }
     
-    private String generateTotpCode(String secret, long time) {
-        // This is a simplified implementation
-        // In production, use a proper TOTP library
-        logger.debug("Generating TOTP code for time window: {}", time);
+    private String generateTotpCode(String secret, long timeStep) {
+        logger.debug("Generating TOTP code for time step: {} using Authy-compatible algorithm", timeStep);
         try {
+            // Decode the base32 secret
             byte[] key = base32.decode(secret);
-            byte[] timeBytes = new byte[8];
-            for (int i = 7; i >= 0; i--) {
-                timeBytes[i] = (byte) (time & 0xFF);
-                time >>= 8;
-            }
             
-            // HMAC-SHA1 (simplified)
-            String hash = java.security.MessageDigest.getInstance("SHA-1")
-                    .digest((new String(key) + new String(timeBytes)).getBytes())
-                    .toString();
+            // Convert time step to byte array (big-endian, 8 bytes)
+            ByteBuffer buffer = ByteBuffer.allocate(8);
+            buffer.putLong(timeStep);
+            byte[] timeBytes = buffer.array();
             
-            // Extract 6-digit code
-            int offset = Integer.parseInt(hash.substring(hash.length() - 1), 16);
-            String binary = Integer.toBinaryString(
-                Integer.parseInt(hash.substring(offset * 2, offset * 2 + 8), 16)
-            );
+            // Create HMAC-SHA1
+            Mac mac = Mac.getInstance("HmacSHA1");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key, "HmacSHA1");
+            mac.init(secretKeySpec);
             
-            String code = String.format("%06d", Integer.parseInt(binary) % 1000000);
-            logger.debug("TOTP code generated successfully");
-            return code;
+            // Calculate HMAC
+            byte[] hash = mac.doFinal(timeBytes);
+            
+            // Dynamic truncation (RFC 4226)
+            int offset = hash[hash.length - 1] & 0x0F;
+            int binary = ((hash[offset] & 0x7F) << 24) |
+                        ((hash[offset + 1] & 0xFF) << 16) |
+                        ((hash[offset + 2] & 0xFF) << 8) |
+                        (hash[offset + 3] & 0xFF);
+            
+            // Generate 6-digit code
+            int code = binary % 1000000;
+            String totpCode = String.format("%06d", code);
+            
+            logger.debug("TOTP code generated successfully: {}", totpCode);
+            return totpCode;
         } catch (Exception e) {
             logger.error("Failed to generate TOTP code: {}", e.getMessage());
             return "000000";

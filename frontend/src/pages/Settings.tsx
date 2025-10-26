@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
-import { TwoFactorMethod } from '../types';
+import { TwoFactorMethod, User } from '../types';
 import './Settings.css';
 
 // Simple logging utility for frontend
@@ -23,41 +23,40 @@ const logger = {
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  
+  const { user, updateUser, logout } = useAuth();
+
   const [activeTab, setActiveTab] = useState<'password' | '2fa'>('password');
-  
+
   // Password change form
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmNewPassword: '',
   });
-  
+
   // 2FA form
   const [twoFactorData, setTwoFactorData] = useState({
     password: '',
     newTwoFactorMethod: '',
     phoneNumber: '',
   });
-  
-  const [qrCode, setQrCode] = useState('');
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
-    logger.info('Settings component mounted', { 
-      userId: user?.id, 
+    logger.info('Settings component mounted', {
+      userId: user?.id,
       email: user?.email,
-      currentTwoFactorMethod: user?.twoFactorMethod 
+      currentTwoFactorMethod: user?.twoFactorMethod
     });
   }, [user]);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    logger.debug('Password form field changed', { 
-      field: e.target.name, 
-      hasValue: !!e.target.value 
+    logger.debug('Password form field changed', {
+      field: e.target.name,
+      hasValue: !!e.target.value
     });
     setPasswordData({
       ...passwordData,
@@ -66,9 +65,9 @@ const Settings: React.FC = () => {
   };
 
   const handle2FAChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    logger.debug('2FA form field changed', { 
-      field: e.target.name, 
-      value: e.target.name === 'password' ? '[REDACTED]' : e.target.value 
+    logger.debug('2FA form field changed', {
+      field: e.target.name,
+      value: e.target.name === 'password' ? '[REDACTED]' : e.target.value
     });
     setTwoFactorData({
       ...twoFactorData,
@@ -120,8 +119,8 @@ const Settings: React.FC = () => {
 
   const handle2FASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logger.info('2FA method change form submitted', { 
-      newMethod: twoFactorData.newTwoFactorMethod 
+    logger.info('2FA method change form submitted', {
+      newMethod: twoFactorData.newTwoFactorMethod
     });
     setError('');
     setSuccess('');
@@ -133,18 +132,38 @@ const Settings: React.FC = () => {
         twoFactorData.newTwoFactorMethod,
         twoFactorData.phoneNumber || undefined
       );
-      
+
       if (response.message) {
         if (twoFactorData.newTwoFactorMethod === TwoFactorMethod.AUTHENTICATOR_APP) {
-          logger.info('Authenticator app selected, requesting QR code');
-          // Get QR code
-          const qrResponse = await authService.getAuthenticatorQR();
-          setQrCode(qrResponse.message || '');
-          logger.info('QR code received for authenticator app setup');
-        } else {
-          logger.info('2FA method updated successfully', { 
-            newMethod: twoFactorData.newTwoFactorMethod 
+          logger.info('Authenticator app selected, navigating to verification page');
+          // Navigate to the new verification page with QR code
+          navigate('/verify-authenticator', {
+            state: { qrCode: response.qrCode || '' }
           });
+        } else {
+          logger.info('2FA method changed to email, fetching updated user profile');
+          try {
+            const userProfile = await authService.getProfile();
+            if (userProfile.id && userProfile.email) {
+              const updatedUser: User = {
+                id: userProfile.id,
+                email: userProfile.email,
+                firstName: userProfile.firstName || '',
+                lastName: userProfile.lastName || '',
+                twoFactorMethod: userProfile.twoFactorMethod,
+                isTwoFactorEnabled: userProfile.isTwoFactorEnabled || false,
+              };
+              logger.info('Updating user context with fresh profile data', {
+                userId: updatedUser.id,
+                email: updatedUser.email,
+                twoFactorMethod: updatedUser.twoFactorMethod
+              });
+              updateUser(updatedUser);
+            }
+          } catch (profileError) {
+            logger.warn('Failed to fetch updated user profile', { error: profileError });
+            // Don't fail the whole operation if profile fetch fails
+          }
           setSuccess('2FA method updated successfully!');
         }
         setTwoFactorData({
@@ -154,15 +173,16 @@ const Settings: React.FC = () => {
         });
       }
     } catch (err: any) {
-      logger.error('2FA method change failed', { 
+      logger.error('2FA method change failed', {
         newMethod: twoFactorData.newTwoFactorMethod,
-        error: err.response?.data?.message || err.message 
+        error: err.response?.data?.message || err.message
       });
       setError(err.response?.data?.message || 'Failed to change 2FA method');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleLogout = async () => {
     logger.info('Logout initiated from settings');
@@ -220,7 +240,7 @@ const Settings: React.FC = () => {
           {activeTab === 'password' ? (
             <form onSubmit={handlePasswordSubmit}>
               <h3>Change Password</h3>
-              
+
               <div className="form-group">
                 <label>Current Password</label>
                 <input
@@ -265,7 +285,7 @@ const Settings: React.FC = () => {
             <form onSubmit={handle2FASubmit}>
               <h3>Two-Factor Authentication</h3>
               <p>Current method: {user?.isTwoFactorEnabled ? user.twoFactorMethod : 'None'}</p>
-              
+
               <div className="form-group">
                 <label>Your Password</label>
                 <input
@@ -294,12 +314,6 @@ const Settings: React.FC = () => {
               {error && <div className="error-message">{error}</div>}
               {success && <div className="success-message">{success}</div>}
 
-              {qrCode && (
-                <div className="qr-container">
-                  <p>Scan this QR code with your authenticator app:</p>
-                  <img src={qrCode} alt="QR Code" style={{ maxWidth: '300px' }} />
-                </div>
-              )}
 
               <button type="submit" disabled={loading} className="submit-button">
                 {loading ? 'Updating...' : 'Update 2FA Method'}

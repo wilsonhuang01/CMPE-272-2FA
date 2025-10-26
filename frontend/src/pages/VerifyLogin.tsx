@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
+import { TwoFactorMethod } from '../types';
 import './VerifyLogin.css';
 
 // Simple logging utility for frontend
@@ -25,19 +26,45 @@ const VerifyLogin: React.FC = () => {
   const location = useLocation();
   const { login } = useAuth();
   
-  // Get email from navigation state
+  // Get email and 2FA method from navigation state
   const email = location.state?.email || '';
+  const twoFactorMethod = location.state?.twoFactorMethod || TwoFactorMethod.EMAIL;
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Generate dynamic instruction text based on 2FA method
+  const getInstructionText = useCallback(() => {
+    logger.debug('Generating instruction text', { 
+      twoFactorMethod, 
+      email,
+      twoFactorMethodType: typeof twoFactorMethod 
+    });
+    
+    switch (twoFactorMethod) {
+      case TwoFactorMethod.EMAIL:
+        return `We've sent a verification code to your email address at ${email}`;
+      case TwoFactorMethod.AUTHENTICATOR_APP:
+        return `Please enter the 6-digit code from your authenticator app for ${email}`;
+      default:
+        logger.warn('Unknown 2FA method, using default instruction', { twoFactorMethod });
+        return `We've sent a verification code to ${email}`;
+    }
+  }, [twoFactorMethod, email]);
 
   // Redirect to login if no email provided
   React.useEffect(() => {
     if (!email) {
       logger.warn('No email provided, redirecting to login');
       navigate('/login');
+    } else {
+      logger.info('VerifyLogin component initialized', { 
+        email, 
+        twoFactorMethod,
+        locationState: location.state
+      });
     }
-  }, [email, navigate]);
+  }, [email, twoFactorMethod, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,9 +116,9 @@ const VerifyLogin: React.FC = () => {
       <div className="verify-login-card">
         <h2>Enter Verification Code</h2>
         <p className="instruction-text">
-          We've sent a verification code to <strong>{email}</strong>
+          {getInstructionText()}
         </p>
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Verification Code</label>

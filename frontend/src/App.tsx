@@ -7,6 +7,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import VerifyLogin from './pages/VerifyLogin';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import VerifyAuthenticator from './pages/VerifyAuthenticator';
 import './App.css';
 
 // Protected route component
@@ -71,6 +72,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verify-authenticator"
+            element={
+              <ProtectedRoute>
+                <VerifyAuthenticator />
               </ProtectedRoute>
             }
           />

@@ -134,6 +134,18 @@ export const authService = {
     }
   },
 
+  async verifyAuthenticatorCode(email: string, code: string): Promise<AuthResponse> {
+    logger.info('Verifying authenticator code', { email });
+    try {
+      const response = await api.post<AuthResponse>('/verify-authenticator', { email, code });
+      logger.info('Authenticator code verification successful', { email });
+      return response.data;
+    } catch (error) {
+      logger.error('Authenticator code verification failed', { email, error });
+      throw error;
+    }
+  },
+
   async logout(): Promise<AuthResponse> {
     logger.info('Starting logout process');
     try {

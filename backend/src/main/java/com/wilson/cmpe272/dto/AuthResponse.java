@@ -14,6 +14,7 @@ public class AuthResponse {
     private Boolean isTwoFactorEnabled;
     private Boolean requiresTwoFactor;
     private String message;
+    private String qrCode;
     
     // Constructors
     public AuthResponse() {}
@@ -123,6 +124,14 @@ public class AuthResponse {
     
     public void setMessage(String message) {
         this.message = message;
+    }
+    
+    public String getQrCode() {
+        return qrCode;
+    }
+    
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
     }
     
     public void setUser(User user) {

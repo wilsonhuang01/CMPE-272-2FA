@@ -2,6 +2,7 @@ package com.wilson.cmpe272.controller;
 
 import com.wilson.cmpe272.dto.*;
 import com.wilson.cmpe272.service.AuthService;
+import com.wilson.cmpe272.entity.User;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,7 @@ public class AuthController {
         logger.info("Login initiation request received for email: {}", loginRequest.getEmail());
         try {
             AuthResponse response = authService.initiateLogin(loginRequest.getEmail(), loginRequest.getPassword());
-            logger.info("Login initiation successful for email: {}, verification code sent", loginRequest.getEmail());
+            logger.info("Login initiation successful for email: {}", loginRequest.getEmail());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Login initiation failed for email: {} - Error: {}", loginRequest.getEmail(), e.getMessage());
@@ -91,7 +92,12 @@ public class AuthController {
         logger.info("2FA method change request received, new method: {}", change2FARequest.getNewTwoFactorMethod());
         try {
             AuthResponse response = authService.changeTwoFactorMethod(change2FARequest);
-            logger.info("2FA method change successful to: {}", change2FARequest.getNewTwoFactorMethod());
+
+            if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.EMAIL) {
+                response.setMessage("2FA method change successful to: " + change2FARequest.getNewTwoFactorMethod());
+            } else if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.AUTHENTICATOR_APP) {
+                response.setMessage("Changing 2FA method to authenticator app. Verification required.");
+            }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("2FA method change failed - Error: {}", e.getMessage());
@@ -136,6 +142,19 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Logout failed - Error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/verify-authenticator")
+    public ResponseEntity<AuthResponse> verifyAuthenticatorCode(@Valid @RequestBody VerificationRequest verificationRequest) {
+        logger.info("Authenticator code verification request received for email: {}", verificationRequest.getEmail());
+        try {
+            AuthResponse response = authService.verifyAuthenticatorCode(verificationRequest);
+            logger.info("Authenticator code verification successful for email: {}", verificationRequest.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Authenticator code verification failed for email: {} - Error: {}", verificationRequest.getEmail(), e.getMessage());
             return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
         }
     }

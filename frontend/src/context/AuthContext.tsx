@@ -22,6 +22,7 @@ interface AuthContextType {
   token: string | null;
   login: (response: AuthResponse) => void;
   logout: () => void;
+  updateUser: (userData: User) => void;
   isAuthenticated: boolean;
 }
 
@@ -81,6 +82,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUser = (userData: User) => {
+    logger.info('Updating user data in AuthContext', { 
+      userId: userData.id, 
+      email: userData.email,
+      twoFactorEnabled: userData.isTwoFactorEnabled,
+      twoFactorMethod: userData.twoFactorMethod,
+      timestamp: new Date().toISOString()
+    });
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    logger.info('User data updated successfully in AuthContext and localStorage');
+  };
+
   const logout = () => {
     logger.info('Processing logout, clearing user session');
     setToken(null);
@@ -91,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

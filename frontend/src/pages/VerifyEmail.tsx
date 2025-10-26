@@ -20,7 +20,6 @@ const VerifyEmail: React.FC = () => {
     try {
       const response = await authService.verifyEmail({ email, code });
       if (response.message) {
-        alert('Email verified successfully! You can now login.');
         navigate('/login');
       }
     } catch (err: any) {
@@ -33,7 +32,6 @@ const VerifyEmail: React.FC = () => {
   const handleResendCode = async () => {
     try {
       await authService.resendCode(email, 'email');
-      alert('Verification code sent to your email');
     } catch (err: any) {
       setError('Failed to resend code');
     }

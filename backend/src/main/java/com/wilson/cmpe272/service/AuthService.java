@@ -106,7 +106,8 @@ public class AuthService {
             
             AuthResponse response = new AuthResponse("Verification code sent to your email");
             response.setRequiresTwoFactor(true);
-            logger.info("Verification code sent successfully for user: {}", email);
+            response.setUser(user); // Include user information including 2FA method
+            logger.info("Verification code sent successfully for user: {} with 2FA method: {}", email, user.getTwoFactorMethod());
             return response;
             
         } catch (Exception e) {
@@ -145,60 +146,6 @@ public class AuthService {
         logger.info("Login completed successfully for user: {}", verificationRequest.getEmail());
         return new AuthResponse(token, user);
     }
-    /*
-    @Deprecated
-    public AuthResponse login(LoginRequest loginRequest) {
-        logger.info("Starting login process for email: {}", loginRequest.getEmail());
-        try {
-            logger.debug("Authenticating user credentials for email: {}", loginRequest.getEmail());
-            Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
-            );
-            
-            User user = (User) authentication.getPrincipal();
-            logger.info("User authentication successful for email: {}", loginRequest.getEmail());
-            
-            // Check if 2FA is required
-            if (user.getIsTwoFactorEnabled() && user.getTwoFactorMethod() != null) {
-                logger.info("2FA is enabled for user: {}, method: {}", loginRequest.getEmail(), user.getTwoFactorMethod());
-                if (loginRequest.getTwoFactorCode() == null) {
-                    // Send 2FA code
-                    logger.info("Sending 2FA code for user: {}", loginRequest.getEmail());
-                    twoFactorService.sendTwoFactorCode(user);
-                    AuthResponse response = new AuthResponse("Two-factor authentication required");
-                    response.setRequiresTwoFactor(true);
-                    response.setTwoFactorMethod(user.getTwoFactorMethod());
-                    userRepository.save(user);
-                    return response;
-                } else {
-                    // Verify 2FA code
-                    logger.debug("Verifying 2FA code for user: {}", loginRequest.getEmail());
-                    if (!twoFactorService.verifyTwoFactorCode(user, loginRequest.getTwoFactorCode())) {
-                        logger.warn("Invalid 2FA code provided for user: {}", loginRequest.getEmail());
-                        throw new BadCredentialsException("Invalid two-factor authentication code");
-                    }
-                    logger.info("2FA verification successful for user: {}", loginRequest.getEmail());
-                }
-            }
-            
-            // Update last login
-            logger.debug("Updating last login time for user: {}", loginRequest.getEmail());
-            user.setLastLoginAt(LocalDateTime.now());
-            userRepository.save(user);
-            
-            // Generate JWT token
-            logger.debug("Generating JWT token for user: {}", loginRequest.getEmail());
-            String token = jwtService.generateToken(user);
-            
-            logger.info("Login completed successfully for user: {}", loginRequest.getEmail());
-            return new AuthResponse(token, user);
-            
-        } catch (Exception e) {
-            logger.error("Login failed for email: {} - Error: {}", loginRequest.getEmail(), e.getMessage());
-            throw new BadCredentialsException("Invalid email or password");
-        }
-    }
-    */
     
     public AuthResponse verifyEmail(VerificationRequest verificationRequest) {
         logger.info("Email verification attempt for email: {}", verificationRequest.getEmail());
@@ -261,21 +208,24 @@ public class AuthService {
         }
         
         // Setup new 2FA method
-        logger.info("Setting up new 2FA method: {} for user: {}", change2FARequest.getNewTwoFactorMethod(), user.getEmail());
-        user.setTwoFactorMethod(change2FARequest.getNewTwoFactorMethod());
-        user.setIsTwoFactorEnabled(true);
-        
         if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.AUTHENTICATOR_APP) {
             logger.info("Setting up authenticator app for user: {}", user.getEmail());
             twoFactorService.setupAuthenticatorApp(user);
+            // Don't enable 2FA yet - wait for verification
+            user.setIsTwoFactorEnabled(false);
+        } else {
+            // For other methods, enable immediately
+            user.setIsTwoFactorEnabled(true);
+            user.setTwoFactorMethod(change2FARequest.getNewTwoFactorMethod());
         }
         
         userRepository.save(user);
         logger.info("2FA method changed successfully for user: {}", user.getEmail());
         
         if (change2FARequest.getNewTwoFactorMethod() == User.TwoFactorMethod.AUTHENTICATOR_APP) {
-            AuthResponse response = new AuthResponse("Authenticator app setup initiated");
-            response.setMessage("Please scan the QR code with your authenticator app");
+            String qrCodeUrl = twoFactorService.getAuthenticatorAppQrCode(user);
+            AuthResponse response = new AuthResponse("Authenticator app setup initiated. Please scan the QR code and verify with a code from your authenticator app.");
+            response.setQrCode(qrCodeUrl);
             return response;
         }
         
@@ -294,8 +244,37 @@ public class AuthService {
         String qrCodeUrl = twoFactorService.getAuthenticatorAppQrCode(user);
         logger.info("QR code generated successfully for user: {}", user.getEmail());
         AuthResponse response = new AuthResponse("QR Code generated");
-        response.setMessage(qrCodeUrl);
+        response.setQrCode(qrCodeUrl);
         return response;
+    }
+    
+    public AuthResponse verifyAuthenticatorCode(VerificationRequest verificationRequest) {
+        logger.info("Authenticator code verification attempt for email: {}", verificationRequest.getEmail());
+        User user = userRepository.findByEmail(verificationRequest.getEmail())
+                .orElseThrow(() -> {
+                    logger.warn("Authenticator verification failed - user not found: {}", verificationRequest.getEmail());
+                    return new IllegalArgumentException("User not found");
+                });
+        
+        // Check if user has authenticator app setup
+        if (user.getTwoFactorSecret() == null) {
+            logger.warn("Authenticator verification failed - authenticator app not properly set up for user: {}", verificationRequest.getEmail());
+            throw new IllegalArgumentException("Authenticator app is not properly set up");
+        }
+        
+        // Verify the authenticator code
+        if (twoFactorService.verifyTotpCode(user, verificationRequest.getCode())) {
+            logger.info("Authenticator code verification successful for user: {}", verificationRequest.getEmail());
+            // Enable 2FA for the user
+            user.setIsTwoFactorEnabled(true);
+            user.setTwoFactorMethod(User.TwoFactorMethod.AUTHENTICATOR_APP);
+            userRepository.save(user);
+            
+            return new AuthResponse("Authenticator app verified and enabled successfully");
+        } else {
+            logger.warn("Authenticator code verification failed - invalid code for user: {}", verificationRequest.getEmail());
+            throw new IllegalArgumentException("Invalid authenticator code");
+        }
     }
     
     public AuthResponse resendVerificationCode(String email, String type) {
@@ -338,10 +317,6 @@ public class AuthService {
         }
     }
     
-    /**
-     * Extract JWT token from the Authorization header
-     * @return The JWT token or null if not found
-     */
     private String extractTokenFromRequest() {
         try {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -361,8 +336,19 @@ public class AuthService {
     public AuthResponse getCurrentUserProfile() {
         logger.info("Retrieving current user profile");
         try {
-            User user = getCurrentUser();
-            logger.info("User profile retrieved for email: {}", user.getEmail());
+            // Get current user from SecurityContext to get the email
+            User currentUser = getCurrentUser();
+            String userEmail = currentUser.getEmail();
+            
+            // Fetch fresh user data from database to ensure we have the latest information
+            User user = userRepository.findByEmail(userEmail)
+                    .orElseThrow(() -> {
+                        logger.warn("User not found in database: {}", userEmail);
+                        return new RuntimeException("User not found");
+                    });
+            
+            logger.info("User profile retrieved for email: {} with latest 2FA status: {}, method: {}", 
+                user.getEmail(), user.getIsTwoFactorEnabled(), user.getTwoFactorMethod());
             
             // Create a response with user profile information
             AuthResponse response = new AuthResponse("User profile retrieved successfully");

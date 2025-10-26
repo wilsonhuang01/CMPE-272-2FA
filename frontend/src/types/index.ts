@@ -23,6 +23,7 @@ export interface AuthResponse {
   isTwoFactorEnabled?: boolean;
   requiresTwoFactor?: boolean;
   message?: string;
+  qrCode?: string;
 }
 
 export interface SignupData {

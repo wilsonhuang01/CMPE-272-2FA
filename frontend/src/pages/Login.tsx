@@ -36,11 +36,20 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       // Step 1: Initiate login - this will validate credentials and send verification code
-      await authService.login(formData.email, formData.password);
+      const response = await authService.login(formData.email, formData.password);
       
-      logger.info('Verification code sent, redirecting to verification page', { email: formData.email });
-      // Redirect to verification page with email
-      navigate('/verify-login', { state: { email: formData.email } });
+      logger.info('Login response received', { 
+        email: formData.email,
+        response: response,
+        twoFactorMethod: response.twoFactorMethod 
+      });
+      // Redirect to verification page with email and 2FA method
+      navigate('/verify-login', { 
+        state: { 
+          email: formData.email,
+          twoFactorMethod: response.twoFactorMethod 
+        } 
+      });
     } catch (err: any) {
       logger.error('Login initiation failed', { 
         email: formData.email, 

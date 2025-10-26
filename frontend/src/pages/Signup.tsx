@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
-import { SignupData, TwoFactorMethod } from '../types';
+import { SignupData } from '../types';
 import './Signup.css';
 
 // Simple logging utility for frontend
@@ -61,7 +61,6 @@ const Signup: React.FC = () => {
           email: formData.email,
           message: response.message 
         });
-        alert(response.message);
         navigate('/verify-email', { state: { email: formData.email } });
       }
     } catch (err: any) {
@@ -146,19 +145,6 @@ const Signup: React.FC = () => {
               onChange={handleChange}
               required
             />
-          </div>
-
-          <div className="form-group">
-            <label>Two-Factor Method (Optional)</label>
-            <select
-              name="twoFactorMethod"
-              value={formData.twoFactorMethod || ''}
-              onChange={handleChange}
-            >
-              <option value="">None</option>
-              <option value={TwoFactorMethod.EMAIL}>Email</option>
-              <option value={TwoFactorMethod.AUTHENTICATOR_APP}>Authenticator App</option>
-            </select>
           </div>
 
           {error && <div className="error-message">{error}</div>}
