@@ -212,7 +212,7 @@ const Settings: React.FC = () => {
         <h1>Settings</h1>
         <div className="nav-buttons">
           <button onClick={handleNavigateToDashboard} className="nav-button">
-            Back to Dashboard
+            Dashboard
           </button>
           <button onClick={handleLogout} className="nav-button">
             Logout

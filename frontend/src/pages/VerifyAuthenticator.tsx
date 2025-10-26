@@ -157,9 +157,6 @@ const VerifyAuthenticator: React.FC = () => {
               <div className="qr-code-wrapper">
                 <QRCode value={qrCode} size={256} />
               </div>
-              <p className="instruction-text">
-                After scanning, enter the 6-digit code from your authenticator app below.
-              </p>
             </div>
           )}
 
@@ -187,11 +184,7 @@ const VerifyAuthenticator: React.FC = () => {
                 <button type="submit" disabled={loading} className="submit-button">
                   {loading ? 'Verifying...' : 'Verify Code'}
                 </button>
-                <button 
-                  type="button" 
-                  onClick={handleCancel}
-                  className="cancel-button"
-                >
+                <button type="button" onClick={handleCancel} className="cancel-button">
                   Cancel
                 </button>
               </div>
