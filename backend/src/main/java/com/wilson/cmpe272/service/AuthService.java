@@ -87,6 +87,66 @@ public class AuthService {
         return new AuthResponse(user, "User created successfully. Please check your email for verification code.");
     }
     
+    // First step of login - validate credentials and send verification code
+    public AuthResponse initiateLogin(String email, String password) {
+        logger.info("Initiating login process for email: {}", email);
+        try {
+            logger.debug("Authenticating user credentials for email: {}", email);
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(email, password)
+            );
+            
+            User user = (User) authentication.getPrincipal();
+            logger.info("User authentication successful for email: {}", email);
+            
+            // Send 2FA code
+            logger.info("Sending 2FA code for user: {}", email);
+            twoFactorService.sendTwoFactorCode(user);
+            userRepository.save(user);
+            
+            AuthResponse response = new AuthResponse("Verification code sent to your email");
+            response.setRequiresTwoFactor(true);
+            logger.info("Verification code sent successfully for user: {}", email);
+            return response;
+            
+        } catch (Exception e) {
+            logger.error("Login initiation failed for email: {} - Error: {}", email, e.getMessage());
+            throw new BadCredentialsException("Invalid email or password");
+        }
+    }
+    
+    // Second step of login - verify the code and complete login
+    public AuthResponse completeLogin(VerificationRequest verificationRequest) {
+        logger.info("Completing login process for email: {}", verificationRequest.getEmail());
+        
+        User user = userRepository.findByEmail(verificationRequest.getEmail())
+                .orElseThrow(() -> {
+                    logger.warn("Login completion failed - user not found: {}", verificationRequest.getEmail());
+                    return new IllegalArgumentException("User not found");
+                });
+        
+        // Verify 2FA code
+        logger.debug("Verifying 2FA code for user: {}", verificationRequest.getEmail());
+        if (!twoFactorService.verifyTwoFactorCode(user, verificationRequest.getCode())) {
+            logger.warn("Invalid 2FA code provided for user: {}", verificationRequest.getEmail());
+            throw new BadCredentialsException("Invalid verification code");
+        }
+        logger.info("2FA verification successful for user: {}", verificationRequest.getEmail());
+        
+        // Update last login
+        logger.debug("Updating last login time for user: {}", verificationRequest.getEmail());
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+        
+        // Generate JWT token
+        logger.debug("Generating JWT token for user: {}", verificationRequest.getEmail());
+        String token = jwtService.generateToken(user);
+        
+        logger.info("Login completed successfully for user: {}", verificationRequest.getEmail());
+        return new AuthResponse(token, user);
+    }
+    /*
+    @Deprecated
     public AuthResponse login(LoginRequest loginRequest) {
         logger.info("Starting login process for email: {}", loginRequest.getEmail());
         try {
@@ -138,6 +198,7 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
     }
+    */
     
     public AuthResponse verifyEmail(VerificationRequest verificationRequest) {
         logger.info("Email verification attempt for email: {}", verificationRequest.getEmail());

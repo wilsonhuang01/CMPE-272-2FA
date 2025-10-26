@@ -36,27 +36,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String userEmail;
         
+        logger.debug("Processing request: {} {}", request.getMethod(), request.getRequestURI());
+        
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            logger.debug("No valid Authorization header found, proceeding without authentication");
             filterChain.doFilter(request, response);
             return;
         }
         
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        logger.debug("Extracting JWT token from Authorization header");
+        
+        try {
+            userEmail = jwtService.extractUsername(jwt);
+            logger.debug("Extracted username from JWT: {}", userEmail);
+        } catch (Exception e) {
+            logger.warn("Failed to extract username from JWT token: {}", e.getMessage());
+            filterChain.doFilter(request, response);
+            return;
+        }
         
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-            
-            if (jwtService.validateToken(jwt, userDetails)) {
-                logger.debug("JWT token valid for user: {}. User enabled: {}. Is account non-locked: {}",
-                    userEmail, userDetails.isEnabled(), userDetails.isAccountNonLocked());
+            logger.debug("Loading user details for authentication: {}", userEmail);
+            try {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
                 
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    userDetails, null, userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtService.validateToken(jwt, userDetails)) {
+                    logger.info("JWT token validated successfully for user: {}. User enabled: {}. Account non-locked: {}",
+                        userEmail, userDetails.isEnabled(), userDetails.isAccountNonLocked());
+                    
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    logger.debug("Authentication context set for user: {}", userEmail);
+                } else {
+                    logger.warn("JWT token validation failed for user: {}", userEmail);
+                }
+            } catch (Exception e) {
+                logger.error("Error during JWT authentication for user: {} - Error: {}", userEmail, e.getMessage());
             }
+        } else if (userEmail == null) {
+            logger.debug("No username extracted from JWT token");
+        } else {
+            logger.debug("User already authenticated, skipping JWT validation");
         }
         
         filterChain.doFilter(request, response);

@@ -30,21 +30,33 @@ public class TokenBlacklistService {
     public void blacklistToken(String token) {
         if (token != null && !token.trim().isEmpty()) {
             blacklistedTokens.put(token, LocalDateTime.now());
-            logger.info("Token blacklisted successfully");
+            logger.info("Token blacklisted successfully. Current blacklist size: {}", blacklistedTokens.size());
+        } else {
+            logger.warn("Attempted to blacklist null or empty token");
         }
     }
     
     public boolean isTokenBlacklisted(String token) {
         if (token == null || token.trim().isEmpty()) {
+            logger.debug("Checking blacklist for null or empty token - returning false");
             return false;
         }
-        return blacklistedTokens.containsKey(token);
+        boolean isBlacklisted = blacklistedTokens.containsKey(token);
+        logger.debug("Token blacklist check result: {} for token ending in: {}", 
+            isBlacklisted, token.length() > 10 ? "..." + token.substring(token.length() - 10) : token);
+        return isBlacklisted;
     }
 
     public void removeFromBlacklist(String token) {
         if (token != null) {
-            blacklistedTokens.remove(token);
-            logger.info("Token removed from blacklist");
+            boolean removed = blacklistedTokens.remove(token) != null;
+            if (removed) {
+                logger.info("Token removed from blacklist successfully. Current blacklist size: {}", blacklistedTokens.size());
+            } else {
+                logger.debug("Token was not found in blacklist during removal attempt");
+            }
+        } else {
+            logger.warn("Attempted to remove null token from blacklist");
         }
     }
     

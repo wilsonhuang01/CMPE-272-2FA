@@ -34,22 +34,31 @@ public class AuthController {
     }
     
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
-        logger.info("Login request received for email: {}", loginRequest.getEmail());
+    public ResponseEntity<AuthResponse> initiateLogin(@Valid @RequestBody LoginRequest loginRequest) {
+        logger.info("Login initiation request received for email: {}", loginRequest.getEmail());
         try {
-            AuthResponse response = authService.login(loginRequest);
-            if (response.getRequiresTwoFactor()) {
-                logger.info("Login requires 2FA for email: {}, method: {}", loginRequest.getEmail(), response.getTwoFactorMethod());
-            } else {
-                logger.info("Login successful for email: {}", loginRequest.getEmail());
-            }
+            AuthResponse response = authService.initiateLogin(loginRequest.getEmail(), loginRequest.getPassword());
+            logger.info("Login initiation successful for email: {}, verification code sent", loginRequest.getEmail());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.error("Login failed for email: {} - Error: {}", loginRequest.getEmail(), e.getMessage());
+            logger.error("Login initiation failed for email: {} - Error: {}", loginRequest.getEmail(), e.getMessage());
             return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
         }
     }
     
+    @PostMapping("/login-verify")
+    public ResponseEntity<AuthResponse> completeLogin(@Valid @RequestBody VerificationRequest verificationRequest) {
+        logger.info("Login completion request received for email: {}", verificationRequest.getEmail());
+        try {
+            AuthResponse response = authService.completeLogin(verificationRequest);
+            logger.info("Login completion successful for email: {}", verificationRequest.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Login completion failed for email: {} - Error: {}", verificationRequest.getEmail(), e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage()));
+        }
+    }
+
     @PostMapping("/verify-email")
     public ResponseEntity<AuthResponse> verifyEmail(@Valid @RequestBody VerificationRequest verificationRequest) {
         logger.info("Email verification request received for email: {}", verificationRequest.getEmail());
