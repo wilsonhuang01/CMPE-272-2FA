@@ -10,7 +10,6 @@ This project demonstrates a complete authentication system featuring:
 - JWT-based authentication
 - Multiple two-factor authentication methods:
   - Email verification
-  - SMS verification
   - Authenticator app (TOTP)
 - Password management
 - Secure session handling
@@ -51,11 +50,9 @@ CMPE-272-2FA/
 - ✅ JWT Authentication with Stateless Sessions
 - ✅ BCrypt Password Hashing
 - ✅ Email-based 2FA
-- ✅ SMS-based 2FA (Twilio integration)
 - ✅ Authenticator App 2FA (TOTP)
 - ✅ Password Change
 - ✅ Token Blacklisting (Secure Logout)
-- ✅ H2 Database (In-Memory)
 - ✅ CORS Configuration
 - ✅ Comprehensive Error Handling
 
@@ -80,7 +77,6 @@ CMPE-272-2FA/
 - **JWT (Java JWT)**
 - **H2 Database**
 - **JPA/Hibernate**
-- **Twilio** (for SMS)
 - **JavaMailSender** (for emails)
 
 ### Frontend
@@ -100,13 +96,11 @@ CMPE-272-2FA/
 - Node.js 14+
 - npm or yarn
 - Gmail account (for email)
-- Twilio account (for SMS, optional)
 
 **For Docker Deployment (Recommended):**
 - Docker Desktop or Docker Engine
 - Docker Compose
 - Gmail account (for email)
-- Twilio account (for SMS, optional)
 
 ### Backend Setup
 
@@ -121,14 +115,7 @@ spring.mail.username=your-email@gmail.com
 spring.mail.password=your-app-password
 ```
 
-3. **Configure Twilio** (optional, for SMS):
-```properties
-TWILIO_ACCOUNT_SID=your-account-sid
-TWILIO_AUTH_TOKEN=your-auth-token
-TWILIO_PHONE_NUMBER=+1234567890
-```
-
-4. **Run the application:**
+3. **Run the application:**
 ```bash
 mvn spring-boot:run
 ```
@@ -217,11 +204,9 @@ docker-compose down
 3. Click on "Two-Factor Authentication" tab
 4. Enter your password
 5. Select a 2FA method:
-   - **Email**: Verification code sent via email
-   - **SMS**: Verification code sent via SMS
+   - **Email (Default)**: Verification code sent via email
    - **Authenticator App**: Scan QR code with Google Authenticator, Authy, etc.
-6. If SMS, provide your phone number
-7. Click "Update 2FA Method"
+6. Click "Update 2FA Method"
 
 ### 4. Change Password
 
@@ -322,10 +307,6 @@ When using Docker Compose or production profile, the application uses MySQL 8.0.
 - Check Gmail app password is correctly configured
 - Verify SMTP settings in `application.properties`
 
-**SMS not working:**
-- Ensure Twilio credentials are configured
-- Check phone number format (+1234567890)
-
 **Database connection error:**
 - H2 starts automatically with the application
 - Check if port 8080 is available
@@ -345,13 +326,6 @@ When using Docker Compose or production profile, the application uses MySQL 8.0.
 - Ensure package.json and package-lock.json are in sync
 - If npm ci fails, try rebuilding: `docker-compose build --no-cache frontend`
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
 ## License
 
 This project is for educational purposes as part of CMPE-272 coursework.
@@ -365,4 +339,3 @@ This project is for educational purposes as part of CMPE-272 coursework.
 - Spring Boot community
 - React community
 - JWT.IO for JWT implementation
-- Twilio for SMS service
