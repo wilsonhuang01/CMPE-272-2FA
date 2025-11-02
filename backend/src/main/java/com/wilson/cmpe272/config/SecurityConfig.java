@@ -56,7 +56,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/login-verify", "/api/auth/verify-email", 
-                               "/api/auth/resend-code", "/h2-console/**").permitAll()
+                               "/api/auth/resend-code", "/actuator/health", "/h2-console/**").permitAll()
                 .requestMatchers("/api/auth/change-password", "/api/auth/change-2fa", 
                                "/api/auth/authenticator-qr", "/api/auth/logout", "/api/auth/profile").authenticated()
                 .anyRequest().authenticated()
@@ -64,8 +64,11 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
-        // For H2 Console
-        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
+        // For H2 Console - only enable in dev profile
+        String activeProfile = System.getenv("SPRING_PROFILES_ACTIVE");
+        if (activeProfile == null || "dev".equals(activeProfile)) {
+            http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
+        }
         
         return http.build();
     }
@@ -73,7 +76,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.Arrays.asList("http://localhost:3000"));
+        
+        // Get allowed origins from environment variable (comma-separated)
+        // For AWS deployment, set ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+        String allowedOrigins = System.getenv("ALLOWED_ORIGINS");
+        if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+            // Default for local development
+            allowedOrigins = "http://localhost:3000";
+        }
+        
+        configuration.setAllowedOrigins(java.util.Arrays.asList(allowedOrigins.split(",")));
         configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
         configuration.setAllowCredentials(true);

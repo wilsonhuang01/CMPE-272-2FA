@@ -295,9 +295,14 @@ When using Docker Compose or production profile, the application uses MySQL 8.0.
 
 ## Documentation
 
+### Local Development
+- [Backend README](backend/README.md)
 - [Backend API Documentation](backend/API_DOCUMENTATION.md)
 - [JWT Logout Implementation](backend/JWT_LOGOUT_IMPLEMENTATION.md)
 - [Frontend README](frontend/README.md)
+
+### AWS Deployment
+- [AWS Deployment Guide](AWS_DEPLOYMENT_GUIDE.md)
 
 ## Troubleshooting
 
@@ -325,17 +330,3 @@ When using Docker Compose or production profile, the application uses MySQL 8.0.
 **Docker build issues:**
 - Ensure package.json and package-lock.json are in sync
 - If npm ci fails, try rebuilding: `docker-compose build --no-cache frontend`
-
-## License
-
-This project is for educational purposes as part of CMPE-272 coursework.
-
-## Author
-
-**Wilson** - CMPE-272 Student
-
-## Acknowledgments
-
-- Spring Boot community
-- React community
-- JWT.IO for JWT implementation

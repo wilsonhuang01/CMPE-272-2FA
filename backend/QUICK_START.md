@@ -217,10 +217,3 @@ Or use environment variable:
 ```bash
 export SPRING_PROFILES_ACTIVE=prod
 ```
-
-## Next Steps
-
-- See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for detailed production configuration
-- See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for API details
-- See [JWT_LOGOUT_IMPLEMENTATION.md](JWT_LOGOUT_IMPLEMENTATION.md) for security features
-
